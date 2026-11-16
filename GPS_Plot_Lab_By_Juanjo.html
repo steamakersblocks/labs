@@ -60,9 +60,8 @@ const example=`# Coordenadas de ejemplo (zona de Alcoy)
 38.6956,-0.4705,573`;
 const map=L.map('map',{preferCanvas:true,zoomControl:true}).setView([38.6986,-0.4730],13);
 const tileOptions=[
- {url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',attr:'&copy; OpenStreetMap contributors &copy; CARTO',subdomains:'abcd'},
  {url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',attr:'&copy; OpenStreetMap contributors',subdomains:''},
- {url:'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',attr:'&copy; OpenStreetMap contributors, HOT',subdomains:'abc'}
+ {url:'https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',attr:'&copy; OpenStreetMap contributors, HOT',subdomains:''}
 ];
 let tileIndex=0,baseLayer=null,failures=0,successes=0;
 function setStatus(message,kind){const el=$('mapStatus');el.textContent=message;el.className='map-status '+(kind||'')}
