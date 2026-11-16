@@ -8,15 +8,36 @@
 </style></head><body>
 <header><h1>📍 GPS Plot Lab <span>— By Juanjo</span></h1><p>Visualizador de coordenadas GPS, recorridos y perfiles de altitud · GPX</p></header>
 <div class="layout"><section class="panel"><h2>Lista de coordenadas</h2><p class="hint">Una línea por punto: <code>lat,long</code> o <code>lat,long,altitud</code> (metros). Usa punto decimal. También admite separadores por espacios o punto y coma.</p>
-<textarea id="coords" spellcheck="false" placeholder="38.000000,-0.500000,450&#10;38.001000,-0.501000,470"></textarea>
-<div class="actions"><button class="primary" id="drawBtn">▱ Dibujar recorrido</button><label class="filelabel" for="gpxFile">📂 Importar GPX<input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml"></label><button id="sampleBtn">🥾 Ruta PR-CV 147</button><button id="clearBtn">Limpiar</button></div>
+<textarea id="coords" spellcheck="false" placeholder="38.000000,-0.500000,450&#10;38.001000,-0.501000,470"># Ejemplo ilustrativo: entorno de Fleix / Barranc de l’Infern
+# 20 puntos simulados, NO es un track de senderismo real
+38.780313,-0.108772,440
+38.779620,-0.109620,425
+38.778780,-0.110350,398
+38.777850,-0.111090,367
+38.776960,-0.111740,335
+38.776070,-0.112230,304
+38.775250,-0.111660,320
+38.774580,-0.110660,361
+38.774130,-0.109540,409
+38.773650,-0.108340,465
+38.773230,-0.107250,501
+38.772470,-0.106360,475
+38.771610,-0.105560,435
+38.770750,-0.104830,392
+38.769850,-0.104220,352
+38.769140,-0.103480,326
+38.768500,-0.102550,351
+38.768110,-0.101430,404
+38.767720,-0.100370,451
+38.767210,-0.099320,489</textarea>
+<div class="actions"><button class="primary" id="drawBtn">▱ Dibujar recorrido</button><label class="filelabel" for="gpxFile">📂 Importar GPX<input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml"></label><button id="clearBtn">Limpiar</button></div>
 <div class="status" id="status" role="status" aria-live="polite"></div>
-<div class="info"><strong>Ruta de referencia:</strong> PR-CV 147 · La Catedral del Senderismo · Barranc de l'Infern, Fleix (La Vall de Laguar). Track oficial de la FEMECV. <a href="https://femecv.blob.core.windows.net/publico/gpx/TRACKPRCV147.gpx" target="_blank" rel="noopener">Descargar GPX oficial</a>. Si el navegador impide cargarlo directamente, descárgalo e impórtalo con «Importar GPX».</div><p class="inline">Los archivos GPX se leen localmente en el navegador: no se suben a ningún servidor.</p></section>
+<div class="info">La lista inicial contiene <strong>20 puntos de demostración</strong> próximos a Fleix y al Barranc de l’Infern (La Vall de Laguar). Sus coordenadas y altitudes son ilustrativas: <strong>no corresponden a una ruta real</strong> y no deben usarse para navegar.</div><p class="inline">Los archivos GPX se leen localmente en el navegador: no se suben a ningún servidor.</p></section>
 <section><div class="panel"><div class="maphead"><h2>Mapa interactivo</h2><button id="centerBtn">⌖ Centrar recorrido</button></div><div id="mapWrap"><div id="map"></div><div id="mapError">No se ha podido cargar Leaflet. Comprueba la conexión a Internet.</div></div><div class="status" id="mapStatus">Cargando mapa OpenStreetMap…</div><div class="stats"><div class="stat"><small>Puntos válidos</small><b id="count">0</b></div><div class="stat"><small>Distancia</small><b id="distance">—</b></div><div class="stat"><small>Altitud mínima</small><b id="minEle">—</b></div><div class="stat"><small>Altitud máxima</small><b id="maxEle">—</b></div></div></div><div class="panel" id="graphPanel" hidden><h2>Perfil de altitud</h2><p class="hint" id="graphDesc">Altitud en metros frente a distancia recorrida.</p><canvas id="graph"></canvas></div></section></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 'use strict';
-const $=id=>document.getElementById(id), urlGPX='https://femecv.blob.core.windows.net/publico/gpx/TRACKPRCV147.gpx';
+const $=id=>document.getElementById(id);
 let map,layer,points=[],lastBounds=null;
 function status(msg,bad=false){$('status').textContent=msg;$('status').className='status '+(bad?'error':'good')}
 function initMap(){if(!window.L){$('mapError').style.display='block';$('mapStatus').textContent='Error de conexión al cargar la biblioteca del mapa.';return}map=L.map('map',{preferCanvas:true}).setView([38.77,-0.12],10);const tiles=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);tiles.on('tileerror',()=>{$('mapStatus').textContent='Algunas teselas no se han podido descargar. Comprueba tu conexión.'});tiles.on('load',()=>{$('mapStatus').textContent='Mapa OpenStreetMap listo. Puedes desplazarlo y hacer zoom.'});layer=L.layerGroup().addTo(map);setTimeout(()=>map.invalidateSize(),200)}
@@ -31,6 +52,5 @@ const markerIndices=p.length<=80?p.map((_,i)=>i):[0,p.length-1];markerIndices.fo
 function renderGraph(){const canvas=$('graph');if($('graphPanel').hidden)return;const valid=points.map((p,i)=>({...p,d:distArrCached[i]})).filter(p=>p.ele!==null);if(valid.length<2)return;const w=Math.max(280,canvas.clientWidth),h=240,dpr=window.devicePixelRatio||1;canvas.width=Math.round(w*dpr);canvas.height=h*dpr;const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);const pad={l:52,r:16,t:18,b:37},pw=w-pad.l-pad.r,ph=h-pad.t-pad.b,xmin=valid[0].d,xmax=valid.at(-1).d,ymin=Math.min(...valid.map(p=>p.ele)),ymax=Math.max(...valid.map(p=>p.ele));const ypad=Math.max(10,(ymax-ymin)*.1),lo=ymin-ypad,hi=ymax+ypad;const X=d=>pad.l+(d-xmin)/Math.max(.000001,xmax-xmin)*pw,Y=e=>pad.t+(hi-e)/(hi-lo)*ph;ctx.font='12px system-ui';ctx.strokeStyle='#47576f';ctx.fillStyle='#b9c9dc';ctx.lineWidth=1;for(let i=0;i<=4;i++){const y=pad.t+i*ph/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText(Math.round(hi-i*(hi-lo)/4)+' m',4,y+4)}for(let i=0;i<=4;i++){const x=pad.l+i*pw/4;ctx.fillText((xmin+i*(xmax-xmin)/4).toFixed(1),x-10,h-16)}ctx.fillText('km',w-28,h-16);ctx.beginPath();valid.forEach((p,i)=>i?ctx.lineTo(X(p.d),Y(p.ele)):ctx.moveTo(X(p.d),Y(p.ele)));ctx.lineTo(X(valid.at(-1).d),pad.t+ph);ctx.lineTo(X(valid[0].d),pad.t+ph);ctx.closePath();ctx.fillStyle='rgba(112,199,180,.15)';ctx.fill();ctx.beginPath();valid.forEach((p,i)=>i?ctx.lineTo(X(p.d),Y(p.ele)):ctx.moveTo(X(p.d),Y(p.ele)));ctx.strokeStyle='#70c7b4';ctx.lineWidth=2.5;ctx.stroke();$('graphDesc').textContent=`Altitud vs. distancia · ${valid.length} puntos con altitud de ${points.length} totales.`}
 let distArrCached=[];const originalDraw=draw;draw=function(){const {p}=parseLines($('coords').value);distArrCached=distArr(p);originalDraw()};
 $('drawBtn').addEventListener('click',draw);$('centerBtn').addEventListener('click',()=>{if(map&&lastBounds){map.invalidateSize();map.fitBounds(lastBounds.pad(.12),{maxZoom:16})}});$('clearBtn').addEventListener('click',()=>{$('coords').value='';points=[];lastBounds=null;if(layer)layer.clearLayers();['count','distance','minEle','maxEle'].forEach(id=>$(id).textContent=id==='count'?'0':'—');$('graphPanel').hidden=true;status('Lista y recorrido limpiados.')});$('gpxFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{loadGPX(await file.text(),file.name)}catch(err){status('Error al importar GPX: '+err.message,true)}finally{e.target.value=''}});
-$('sampleBtn').addEventListener('click',async()=>{status('Intentando importar el track oficial PR-CV 147…');try{const res=await fetch(urlGPX,{mode:'cors'});if(!res.ok)throw Error('HTTP '+res.status);loadGPX(await res.text(),'PR-CV 147 (FEMECV)')}catch(err){status('El servidor de la FEMECV no permite cargar directamente su GPX desde esta página (o está temporalmente inaccesible). Usa el enlace «Descargar GPX oficial» y después «Importar GPX».',true)}});
-window.addEventListener('resize',()=>{if(map)map.invalidateSize();renderGraph()});initMap();
+window.addEventListener('resize',()=>{if(map)map.invalidateSize();renderGraph()});initMap();draw();
 </script></body></html>
